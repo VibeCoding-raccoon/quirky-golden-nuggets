@@ -1,0 +1,15 @@
+n=int(input("enter a number for obataining its factors"))       #Take a number
+
+factors=[]                                                      #Make a list to store the numbers
+
+def fact(x):
+      global factors
+      
+      for f in range(1, x+1):                                   #cycling through all numbers from 1 to n
+            if x%f==0:                                          #checks if the number is divisible by n
+                  factors.append(f)                             #adds that number to the factor list if it 
+
+fact(n)  #call the function
+
+for i in factors:
+      print(i)                                                  #Printing each factor line by line
