@@ -1,0 +1,13 @@
+t1=float(input("enter the first term of the pattern"))              #starting term
+n_terms=int(input("enter the number of terms in the pattern"))            #number of terms in the pattern
+
+pattern=[]                                  #list to store terms of pattern
+def calc_terms(n, terms):                   #Function to generate pattern. You can modify it to generate your own pattern
+      for i in range(1, terms+1):
+            pattern.append(n)
+            n *= 2
+
+calc_terms(t1, n_terms)                     #Call the function
+
+for i in pattern:                           #Print each term line by line
+      print(i)
