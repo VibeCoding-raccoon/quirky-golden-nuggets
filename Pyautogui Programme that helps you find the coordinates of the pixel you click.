@@ -1,0 +1,12 @@
+import pyautogui as p
+import time as ti
+
+print("Move your mouse to the target position. Press Ctrl+C to stop.")
+try:
+    while True:
+        x, y = p.position()
+        position_str = f" X: {x} Y: {y}"
+        print(position_str)
+        ti.sleep(0.05)
+except KeyboardInterrupt:
+    print("\nDone.")
