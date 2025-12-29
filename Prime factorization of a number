@@ -1,0 +1,34 @@
+n=int(input("enter a number (integer) to obtain its prime factorization"))
+
+process_n=n                                #making a copy of n
+
+factors=[]                                 #making a list to store the factors of n
+check_fac=[]                               #making a list for checking if a factor is a prime factor or not
+pfac=[]                                    #making a list to store the distinct prime factors
+p_factorization_lst=[]                     #making a list to store the non-distinct prime factors
+
+def fact(x, lst):
+      global factors
+      
+      for f in range(1, x+1):              #cycling through all numbers from 1 to n
+            if x%f==0:                     #checking divisibility
+                  lst.append(f)            #storing the factor in the specified list
+
+fact(n, factors)                           #factorizing n and storing it in factors list
+
+for f in factors:                          #cycling through all the factors
+      fact(f, check_fac)                   #factorizing every factor
+      if len(check_fac)==2:                #checking if factor has only two factors: indicating it is a prime factor
+            pfac.append(f)                 #storing the prime factor in pfac list
+            
+      check_fac=[]                         #resetting check_fac
+
+for p in pfac:                             #cycling through each confirmed prime factor
+      while process_n % p==0:              #dividing the number by a prime factor again and again until it cannot be divided more.
+            p_factorization_lst.append(str(p))        #storing that prime factor with repeats
+            
+            process_n //= p                #reducing number
+
+p_factorization=" x ".join(p_factorization_lst)        #formatting the list in a p1 x p1 x p2 x p2........
+
+print(p_factorization)
