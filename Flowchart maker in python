@@ -1,0 +1,471 @@
+requiremnts: tkinter
+
+#bash
+pip install tkinter
+
+
+
+import tkinter as tk
+from tkinter import simpledialog, messagebox, filedialog, font
+import json
+import math
+
+class FlowchartNode:
+    def __init__(self, canvas, node_id, node_type, x, y, text=""):
+        self.canvas = canvas
+        self.id = node_id
+        self.type = node_type  # 'process' or 'decision'
+        self.x = x
+        self.y = y
+        self.width = 140
+        self.height = 70
+        self.text = text or ("Process" if node_type == 'process' else "Decision")
+        self.selected = False
+        self.items = []  # canvas items ids for this node
+        self.text_id = None
+
+        self.draw()
+
+    def draw(self):
+        # Draw shape based on type
+        if self.type == 'process':
+            # rectangle with rounded corners
+            radius = 15
+            x1, y1 = self.x - self.width//2, self.y - self.height//2
+            x2, y2 = self.x + self.width//2, self.y + self.height//2
+
+            self.shape_id = self.canvas.create_rectangle(x1, y1, x2, y2, fill="#2980b9", outline="#1c5980", width=2)
+        elif self.type == 'decision':
+            # diamond shape
+            x, y = self.x, self.y
+            w, h = self.width//2, self.height//2
+            points = [x, y-h, x+w, y, x, y+h, x-w, y]
+            self.shape_id = self.canvas.create_polygon(points, fill="#27ae60", outline="#1e6e32", width=2)
+        self.items.append(self.shape_id)
+
+        # Draw text
+        self.text_id = self.canvas.create_text(self.x, self.y, text=self.text, font=("Helvetica", 12), fill="white", width=self.width-10)
+        self.items.append(self.text_id)
+
+    def move(self, dx, dy):
+        self.x += dx
+        self.y += dy
+        for item in self.items:
+            self.canvas.move(item, dx, dy)
+
+    def is_inside(self, x, y):
+        # Rough bounding box check
+        x1, y1 = self.x - self.width//2, self.y - self.height//2
+        x2, y2 = self.x + self.width//2, self.y + self.height//2
+        return x1 <= x <= x2 and y1 <= y <= y2
+
+    def update_text(self, new_text):
+        self.text = new_text
+        self.canvas.itemconfigure(self.text_id, text=new_text)
+
+    def select(self):
+        if not self.selected:
+            self.canvas.itemconfigure(self.shape_id, width=3)
+            self.selected = True
+
+    def deselect(self):
+        if self.selected:
+            self.canvas.itemconfigure(self.shape_id, width=2)
+            self.selected = False
+
+    def delete(self):
+        for item in self.items:
+            self.canvas.delete(item)
+
+class FlowchartConnector:
+    def __init__(self, canvas, conn_id, node_from: FlowchartNode, node_to: FlowchartNode):
+        self.canvas = canvas
+        self.id = conn_id
+        self.node_from = node_from
+        self.node_to = node_to
+        self.line_id = None
+        self.selected = False
+
+        self.draw()
+
+    def draw(self):
+        # Calculate start and end points with some padding (node edge)
+        start = self._get_edge_point(self.node_from, self.node_to)
+        end = self._get_edge_point(self.node_to, self.node_from)
+        # Draw line with arrow
+        if self.line_id:
+            self.canvas.coords(self.line_id, *start, *end)
+        else:
+            self.line_id = self.canvas.create_line(*start, *end, arrow=tk.LAST, width=2, fill="#34495e")
+
+    def _get_edge_point(self, node_src, node_dst):
+        x1, y1 = node_src.x, node_src.y
+        x2, y2 = node_dst.x, node_dst.y
+        dx = x2 - x1
+        dy = y2 - y1
+        if dx == 0 and dy == 0:
+            return x1, y1
+        angle = math.atan2(dy, dx)
+
+        if node_src.type == 'process':
+            w, h = node_src.width//2, node_src.height//2
+        else:
+            w, h = node_src.width//2 * 0.9, node_src.height//2 * 0.9
+
+        abs_tan = abs(math.tan(angle))
+        if abs_tan * w <= h:
+            if dx > 0:
+                ex = x1 + w
+                ey = y1 + w * math.tan(angle)
+            else:
+                ex = x1 - w
+                ey = y1 - w * math.tan(angle)
+        else:
+            if dy > 0:
+                ey = y1 + h
+                ex = x1 + h / math.tan(angle)
+            else:
+                ey = y1 - h
+                ex = x1 - h / math.tan(angle)
+        return (ex, ey)
+
+    def is_near(self, x, y):
+        coords = self.canvas.coords(self.line_id)
+        if len(coords) < 4:
+            return False
+        x1, y1, x2, y2 = coords
+        px = x2 - x1
+        py = y2 - y1
+        norm = px*px + py*py
+        u = ((x - x1)*px + (y - y1)*py)/norm if norm != 0 else 0
+        u = max(min(u,1),0)
+        dx = x1 + u*px - x
+        dy = y1 + u*py - y
+        dist = math.sqrt(dx*dx + dy*dy)
+        return dist < 8
+
+    def select(self):
+        if not self.selected:
+            self.canvas.itemconfigure(self.line_id, fill="#e74c3c", width=3)
+            self.selected = True
+
+    def deselect(self):
+        if self.selected:
+            self.canvas.itemconfigure(self.line_id, fill="#34495e", width=2)
+            self.selected = False
+
+    def delete(self):
+        if self.line_id:
+            self.canvas.delete(self.line_id)
+
+class FlowchartMaker:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Flowchart Maker with Title")
+        self.root.geometry("1000x730")
+        self.root.configure(bg='#2c3e50')
+
+        self.font = ("Helvetica", 12)
+
+        # Toolbar frame
+        self.toolbar = tk.Frame(root, bg="#34495e", height=40)
+        self.toolbar.pack(side=tk.TOP, fill=tk.X)
+
+        # Buttons
+        self.btn_add_process = tk.Button(self.toolbar, text="Add Process", command=self.add_process, bg="#2980b9", fg="white", font=self.font)
+        self.btn_add_process.pack(side=tk.LEFT, padx=6, pady=6)
+
+        self.btn_add_decision = tk.Button(self.toolbar, text="Add Decision", command=self.add_decision, bg="#27ae60", fg="white", font=self.font)
+        self.btn_add_decision.pack(side=tk.LEFT, padx=6, pady=6)
+
+        self.btn_connect = tk.Button(self.toolbar, text="Connect", command=self.start_connect, bg="#f39c12", fg="white", font=self.font)
+        self.btn_connect.pack(side=tk.LEFT, padx=6, pady=6)
+
+        self.btn_delete = tk.Button(self.toolbar, text="Delete Selected", command=self.delete_selected, bg="#c0392b", fg="white", font=self.font)
+        self.btn_delete.pack(side=tk.LEFT, padx=6, pady=6)
+
+        self.btn_clear = tk.Button(self.toolbar, text="Clear All", command=self.clear_all, bg="#7f8c8d", fg="white", font=self.font)
+        self.btn_clear.pack(side=tk.LEFT, padx=6, pady=6)
+
+        self.btn_save = tk.Button(self.toolbar, text="Save", command=self.save_flowchart, bg="#16a085", fg="white", font=self.font)
+        self.btn_save.pack(side=tk.LEFT, padx=6, pady=6)
+
+        self.btn_load = tk.Button(self.toolbar, text="Load", command=self.load_flowchart, bg="#16a085", fg="white", font=self.font)
+        self.btn_load.pack(side=tk.LEFT, padx=6, pady=6)
+
+        # Title Entry frame
+        self.title_frame = tk.Frame(root, bg='#34495e', height=40)
+        self.title_frame.pack(fill=tk.X)
+
+        self.lbl_title = tk.Label(self.title_frame, text="Flowchart Title:", fg="white", bg='#34495e', font=("Helvetica", 14, "bold"))
+        self.lbl_title.pack(side=tk.LEFT, padx=(10,4), pady=6)
+
+        self.var_title = tk.StringVar()
+        self.entry_title = tk.Entry(self.title_frame, textvariable=self.var_title, font=("Helvetica", 14), width=50)
+        self.entry_title.pack(side=tk.LEFT, padx=4, pady=6)
+
+        self.var_title.set("My Flowchart")
+
+        # Canvas
+        self.canvas = tk.Canvas(root, bg="#ecf0f1", cursor="arrow")
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        # Flowchart data
+        self.nodes = {}
+        self.connectors = {}
+        self.node_counter = 0
+        self.connector_counter = 0
+
+        # State
+        self.current_mode = None
+        self.selected_node = None
+        self.selected_connector = None
+
+        self.connect_first_node = None
+
+        # Movement
+        self.drag_data = {"x": 0, "y": 0, "item": None}
+
+        # Bind events
+        self.canvas.bind("<Button-1>", self.canvas_click)
+        self.canvas.bind("<ButtonRelease-1>", self.canvas_release)
+        self.canvas.bind("<B1-Motion>", self.canvas_drag)
+        self.canvas.bind("<Double-1>", self.canvas_double_click)
+
+        self.root.bind("<Delete>", lambda e: self.delete_selected())
+
+    def reset_mode(self):
+        self.current_mode = None
+        self.connect_first_node = None
+        self.canvas.config(cursor="arrow")
+        self.deselect_all()
+
+    def deselect_all(self):
+        if self.selected_node:
+            self.selected_node.deselect()
+            self.selected_node = None
+        if self.selected_connector:
+            self.selected_connector.deselect()
+            self.selected_connector = None
+
+    def add_process(self):
+        self.reset_mode()
+        self.current_mode = 'add_process'
+        self.canvas.config(cursor="cross")
+
+    def add_decision(self):
+        self.reset_mode()
+        self.current_mode = 'add_decision'
+        self.canvas.config(cursor="cross")
+
+    def start_connect(self):
+        self.reset_mode()
+        self.current_mode = 'connect'
+        self.canvas.config(cursor="tcross")
+        self.connect_first_node = None
+
+    def generate_node_id(self):
+        self.node_counter += 1
+        return f"node{self.node_counter}"
+
+    def generate_connector_id(self):
+        self.connector_counter += 1
+        return f"conn{self.connector_counter}"
+
+    def canvas_click(self, event):
+        x, y = event.x, event.y
+        if self.current_mode == 'add_process':
+            node_id = self.generate_node_id()
+            node = FlowchartNode(self.canvas, node_id, 'process', x, y)
+            self.nodes[node_id] = node
+            self.reset_mode()
+        elif self.current_mode == 'add_decision':
+            node_id = self.generate_node_id()
+            node = FlowchartNode(self.canvas, node_id, 'decision', x, y)
+            self.nodes[node_id] = node
+            self.reset_mode()
+        elif self.current_mode == 'connect':
+            clicked_node = self.find_node_at(x, y)
+            if clicked_node:
+                if not self.connect_first_node:
+                    self.connect_first_node = clicked_node
+                    clicked_node.select()
+                else:
+                    if clicked_node == self.connect_first_node:
+                        clicked_node.deselect()
+                        self.connect_first_node = None
+                        return
+                    conn_id = self.generate_connector_id()
+                    conn = FlowchartConnector(self.canvas, conn_id, self.connect_first_node, clicked_node)
+                    self.connectors[conn_id] = conn
+                    self.connect_first_node.deselect()
+                    self.connect_first_node = None
+                    self.reset_mode()
+        else:
+            node = self.find_node_at(x, y)
+            if node:
+                self.select_node(node)
+                self.drag_data["item"] = node
+                self.drag_data["x"] = x
+                self.drag_data["y"] = y
+            else:
+                connector = self.find_connector_at(x, y)
+                if connector:
+                    self.select_connector(connector)
+                    self.drag_data["item"] = None
+                else:
+                    self.deselect_all()
+                    self.drag_data["item"] = None
+
+    def canvas_release(self, event):
+        self.drag_data["item"] = None
+
+    def canvas_drag(self, event):
+        item = self.drag_data["item"]
+        if item and isinstance(item, FlowchartNode):
+            dx = event.x - self.drag_data["x"]
+            dy = event.y - self.drag_data["y"]
+            item.move(dx, dy)
+            self.drag_data["x"] = event.x
+            self.drag_data["y"] = event.y
+            for conn in self.connectors.values():
+                if conn.node_from == item or conn.node_to == item:
+                    conn.draw()
+
+    def canvas_double_click(self, event):
+        x, y = event.x, event.y
+        node = self.find_node_at(x, y)
+        if node:
+            result = simpledialog.askstring("Edit Text", "Enter new text:", initialvalue=node.text, parent=self.root)
+            if result is not None:
+                node.update_text(result)
+
+    def find_node_at(self, x, y):
+        for node in reversed(list(self.nodes.values())):
+            if node.is_inside(x, y):
+                return node
+        return None
+
+    def find_connector_at(self, x, y):
+        for conn in self.connectors.values():
+            if conn.is_near(x, y):
+                return conn
+        return None
+
+    def select_node(self, node):
+        if self.selected_node:
+            self.selected_node.deselect()
+        if self.selected_connector:
+            self.selected_connector.deselect()
+            self.selected_connector = None
+        self.selected_node = node
+        node.select()
+
+    def select_connector(self, connector):
+        if self.selected_connector:
+            self.selected_connector.deselect()
+        if self.selected_node:
+            self.selected_node.deselect()
+            self.selected_node = None
+        self.selected_connector = connector
+        connector.select()
+
+    def delete_selected(self):
+        if self.selected_node:
+            to_remove = [cid for cid, c in self.connectors.items() if c.node_from == self.selected_node or c.node_to == self.selected_node]
+            for cid in to_remove:
+                self.connectors[cid].delete()
+                del self.connectors[cid]
+            self.selected_node.delete()
+            del self.nodes[self.selected_node.id]
+            self.selected_node = None
+        elif self.selected_connector:
+            self.selected_connector.delete()
+            del self.connectors[self.selected_connector.id]
+            self.selected_connector = None
+
+    def clear_all(self):
+        for node in list(self.nodes.values()):
+            node.delete()
+        for conn in list(self.connectors.values()):
+            conn.delete()
+        self.nodes.clear()
+        self.connectors.clear()
+        self.selected_node = None
+        self.selected_connector = None
+        self.node_counter = 0
+        self.connector_counter = 0
+        self.reset_mode()
+        self.var_title.set("My Flowchart")
+
+    def save_flowchart(self):
+        if not self.nodes:
+            messagebox.showinfo("Empty", "Nothing to save!")
+            return
+        save_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files","*.json")])
+        if not save_path:
+            return
+        data = {
+            "title": self.var_title.get(),
+            "nodes": [],
+            "connectors": []
+        }
+        for node in self.nodes.values():
+            data["nodes"].append({
+                "id": node.id,
+                "type": node.type,
+                "x": node.x,
+                "y": node.y,
+                "text": node.text
+            })
+
+        for conn in self.connectors.values():
+            data["connectors"].append({
+                "id": conn.id,
+                "from": conn.node_from.id,
+                "to": conn.node_to.id
+            })
+
+        try:
+            with open(save_path, "w") as f:
+                json.dump(data, f, indent=2)
+            messagebox.showinfo("Saved", f"Flowchart saved to {save_path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save file:\n{e}")
+
+    def load_flowchart(self):
+        load_path = filedialog.askopenfilename(defaultextension=".json", filetypes=[("JSON files","*.json")])
+        if not load_path:
+            return
+        try:
+            with open(load_path, "r") as f:
+                data = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load file:\n{e}")
+            return
+
+        self.clear_all()
+        self.var_title.set(data.get("title", "My Flowchart"))
+        node_map = {}
+        for n in data.get("nodes", []):
+            node = FlowchartNode(self.canvas, n["id"], n["type"], n["x"], n["y"], n["text"])
+            self.nodes[n["id"]] = node
+            node_map[n["id"]] = node
+            self.node_counter = max(self.node_counter, int(n["id"].replace("node", "")))
+
+        for c in data.get("connectors", []):
+            node_from = node_map.get(c["from"])
+            node_to = node_map.get(c["to"])
+            if node_from and node_to:
+                conn = FlowchartConnector(self.canvas, c["id"], node_from, node_to)
+                self.connectors[c["id"]] = conn
+                self.connector_counter = max(self.connector_counter, int(c["id"].replace("conn", "")))
+        messagebox.showinfo("Loaded", f"Flowchart loaded from {load_path}")
+
+def main():
+    root = tk.Tk()
+    app = FlowchartMaker(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
