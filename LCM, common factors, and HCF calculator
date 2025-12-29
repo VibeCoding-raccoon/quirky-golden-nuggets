@@ -1,0 +1,30 @@
+#LCM CHECKER
+n1=int(input("enter first no."))
+n2=int(input("enter first no."))
+n1multi=[]
+for i in range(1,n2+1):
+    n1multi.append(n1*i)
+for i in n1multi:
+    if i%n2==0:
+        print("The LCM is:",i)
+        break
+    else:
+        continue
+
+#COMMON FACTORS FINDER
+n1fac=[]
+for i in range(1,n1+1):
+    if n1%i==0:
+        n1fac.append(i)
+comfac=[]
+for i in n1fac:
+    if n2%i==0:
+        comfac.append(i)
+print("the common factors are:")
+for i in comfac:
+    print(i)
+
+print("\n")
+
+#HCF FINDER
+print("The HCF is:",max(comfac))
