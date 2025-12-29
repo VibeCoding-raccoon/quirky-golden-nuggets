@@ -1,0 +1,63 @@
+requirements: tkinter
+
+#bash
+pip install tkinter
+
+
+
+import tkinter as tk
+
+table_letters = {}
+
+for first in range(26):
+    for second in range(26):
+        key = chr(ord('a') + first) + chr(ord('a') + second)
+        value = chr(ord('a') + (first + second) % 26)
+        table_letters[key] = value
+
+root=tk.Tk()
+
+tk.Label(root, text="Enter text to be encrypted:", font=("PERPETUA TITLING MT", 20)).grid(row=1, column=1)
+plaintextbox=tk.Text(height=10)
+plaintextbox.grid(row=1, column=2)
+
+tk.Label(root, text="Enter keyword for encrypting:", font=("PERPETUA TITLING MT", 20)).grid(row=2, column=1)
+keywordbox=tk.Text(height=5)
+keywordbox.grid(row=2, column=2)
+
+ciphertextlabel=tk.Label(root, text="", font=("CASTELLAR", 20))
+ciphertextlabel.grid(row=5, column=1)
+
+def get_data():
+    global plaintext,keyword
+    plaintext=plaintextbox.get("1.0", tk.END)
+    keyword=keywordbox.get("1.0", tk.END)
+    def encrypt():
+        global plaintextlist, coordinates, lettervalues, ciphertext, ciphertextlabel
+        plaintextlist=list(plaintext)
+        keywordlist=list(keyword)
+        keywordstream=[]
+        for i in range(1,len(plaintextlist)+1):
+            keywordstream.append(keywordlist[(i-1)%len(keywordlist)])
+        coordinates=zip(plaintextlist, keywordstream)
+        lettervalues = []
+        for key in coordinates:
+            keypair = key[0].lower() + key[1].lower()
+            if keypair in table_letters:
+                value = table_letters[keypair]
+                lettervalues.append(value)
+            else:
+                lettervalues.append(key[0])
+
+        ciphertext="".join(lettervalues)
+
+    def update():
+        ciphertextlabel.config(text=f"The Vigenere Cypher Encrypted text is : {ciphertext}")
+
+    encrypt()
+    update()
+
+convert=tk.Button(root, text="To Encrypt text, click here", font=("CASTELLAR", 20), command=get_data)
+convert.grid(row=4, column=1) 
+
+root.mainloop()
