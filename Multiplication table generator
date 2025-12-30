@@ -1,0 +1,6 @@
+print("this is a multiplication table generator for any number")
+a=int(input("enter the desired number of which the multiplication table shall be generated"))
+b=int(input("enter how many consecutive multiples do you want to see of your number"))
+
+for i in range(1,b+1):
+    print(a*i)
