@@ -1,10 +1,3 @@
-requiremnts: tkinter
-
-#bash
-pip install tkinter
-
-
-
 import tkinter as tk
 from tkinter import simpledialog, messagebox, filedialog, font
 import json
